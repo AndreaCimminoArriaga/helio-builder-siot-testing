@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>tests</groupId>
   <artifactId>siot-cli</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   
   <properties>
 		<maven.compiler.target>11</maven.compiler.target>
@@ -14,15 +14,10 @@
 	</properties>
   
   <dependencies>
-	  <dependency>
-	  	<groupId>io.github.helio-ecosystem</groupId>
-		<artifactId>helio-builder-jld11map</artifactId>
-		<version>0.1.6</version>
-		</dependency>
 		<dependency>
 			<groupId>io.github.helio-ecosystem</groupId>
 			<artifactId>helio-blueprints</artifactId>
-			<version>0.4.20</version>
+			<version>0.4.26</version>
 		</dependency>
   </dependencies>
   

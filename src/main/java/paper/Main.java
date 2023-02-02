@@ -1,17 +1,18 @@
 package paper;
 
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import org.apache.jena.ext.com.google.common.collect.Maps;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import helio.blueprints.TranslationUnit;
 import helio.blueprints.UnitBuilder;
@@ -21,12 +22,14 @@ import helio.blueprints.exceptions.ExtensionNotFoundException;
 import helio.blueprints.exceptions.IncompatibleMappingException;
 import helio.blueprints.exceptions.IncorrectMappingException;
 import helio.blueprints.exceptions.TranslationUnitExecutionException;
-import helio.builder.jld11map.JLD11Builder;
 
 public class Main {
 
 
+	private static String DEFAULT_COMPONENTS = "./default-components.json";
+
 	public static void main(String[] args) throws Exception {
+		Map<String, Object> arguments = Maps.newHashMap();
 		try {
 			if (Arrays.asList(args).contains("-debug")) {
 				Scanner s = new Scanner(System.in);
@@ -52,9 +55,8 @@ public class Main {
 			while (index <= times) {
 				long start1 = System.currentTimeMillis();
 				TranslationUnit unit = build(mappingFile);
-				unit.getTask().run();
-				result = unit.getDataTranslated().get(0);
-				unit.flushDataTranslated();
+				
+				result = unit.getTask(arguments).call();
 				long end2 = System.currentTimeMillis();
 				System.out.println("Elapsed Time in milli seconds: " + (end2 - start1));
 				index++;
@@ -79,58 +81,40 @@ public class Main {
 	}
 
 	static {
-
-		try {
-			Components.registerAndLoad(
-					"https://github.com/helio-ecosystem/helio-providers-web/releases/download/v0.1.1/helio-providers-web-0.1.1.jar",
-					"helio.providers.HttpProvider", ComponentType.PROVIDER);
-		} catch (ExtensionNotFoundException e) {
-			e.printStackTrace();
-		}
-		try {
-			Components.registerAndLoad("/Users/andreacimmino/Desktop/helio-provider-url-0.1.0.jar",
-					"provider.URLProvider", ComponentType.PROVIDER);
-		} catch (ExtensionNotFoundException e) {
-			e.printStackTrace();
-		}
-		try {
-			Components.registerAndLoad("/Users/andreacimmino/Desktop/helio-handler-csv-0.1.0.jar",
-					"handlers.CsvHandler", ComponentType.HANDLER);
-		} catch (ExtensionNotFoundException e) {
-			e.printStackTrace();
-		}
-		try {
-			Components.registerAndLoad(
-					"https://github.com/helio-ecosystem/helio-handler-jayway/releases/download/v0.1.1/helio-handler-jayway-0.1.1.jar",
-					"handlers.JsonHandler", ComponentType.HANDLER);
-		} catch (ExtensionNotFoundException e) {
-			e.printStackTrace();
-		}
-
-		try {
-			Components.registerAndLoad(
-					"https://github.com/helio-ecosystem/helio-provider-files/releases/download/v0.1.1/helio-provider-files-0.1.1.jar",
-					"helio.providers.files.FileProvider", ComponentType.PROVIDER);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		try {
-			Components.registerAndLoad(
-					"https://github.com/helio-ecosystem/helio-provider-files/releases/download/v0.1.1/helio-provider-files-0.1.1.jar",
-					"helio.providers.files.FileWatcherProvider", ComponentType.PROVIDER);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		try {
-			Components.registerAndLoad(null, "helio.builder.jld11map.DummyProvider", ComponentType.PROVIDER);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		 GSON = new Gson();
+		 loadDefaultComponents();
 	}
 
+	// -- default components methods
+		public static void loadDefaultComponents() {
+			JsonArray components = readDefaultComponents();
+			for(int i = 0; i < components.size(); i++) {
+				JsonObject json = components.get(i).getAsJsonObject();
+				try {
+					Components.register(json.get("source").getAsString(), json.get("clazz").getAsString(), ComponentType.valueOf(json.get("type").getAsString()));
+				}catch(Exception e) {
+					System.out.println(e.getMessage());
+				}
+			}
+		}
+
+		private static JsonArray readDefaultComponents() {
+			try {
+				
+				String content = Files.readString(Paths.get(DEFAULT_COMPONENTS));
+				return GSON.fromJson(content, JsonArray.class);
+			} catch (IOException e) {
+				e.printStackTrace();
+				//System.exit(-1);
+			}
+			return null;
+
+		}
+
+
+		
+	
+	
 	public static String readFile(String file) {
 		try {
 			return Files.readString(Path.of(file));
@@ -146,27 +130,16 @@ public class Main {
 
 		String mapping = readFile(mappingFile);
 
-		UnitBuilder builder = new JLD11Builder();
+		UnitBuilder builder = Components.newBuilderInstance("SIoTRxBuilder");
 		Set<TranslationUnit> list = builder.parseMapping(mapping);
 		unit = list.iterator().next();
 
 		return unit;
 	}
 
-	public static String runUnit(TranslationUnit unit, ExecutorService service)
-			throws InterruptedException, ExecutionException, TranslationUnitExecutionException {
-		String result = "";
+	
 
-		Future<?> f = service.submit(unit.getTask());
-		f.get();
-		result = unit.getDataTranslated().get(0);
-		f.cancel(true);
-		service.shutdown();
-
-		return result;
-	}
-
-	public static final Gson GSON = new Gson();
+	public static Gson GSON = new Gson();
 
 	public static boolean equals(String result, String expected) {
 		JsonObject object1 = GSON.fromJson(result, JsonObject.class);
